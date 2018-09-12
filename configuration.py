@@ -1,5 +1,5 @@
 # Bot configuration constants
-BOT_TOKEN = "NDgzNDY2MDE5MDM0MTAzODA5.DnTbdA.RRfdZH7XFVFKwFmPc6hqTUzRNRk"
+BOT_TOKEN = input("Please enter bot token ")
 
 BOT_PREFIX = "Travis"
 BOT_DESCRIPTION = ""
