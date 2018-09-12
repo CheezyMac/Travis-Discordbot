@@ -140,27 +140,83 @@ class Checkers(Game):
             return
         self.engine = gameengines.CheckersEngine(players)
         self.board_message = None
+        self.active_player = 0
         self.ready = True
+        self.message_bin = []
         Game.__init__(self, client, game_channel, host_channel, players)
 
     async def announcerules(self):
+
         await self.client.send_message(self.game_channel, "To make a move, simply type the start & end positions of the"
-                                                          "move, including any temporary stops. Start & end are"
+                                                          " move, including any temporary stops. Start & end are"
                                                           " represented in row column form, i.e A5 or F7")
         await self.client.send_message(self.game_channel, "Please note that your entire move must be in the message for"
                                                           " it to count. If you are jumping over multiple pieces, each"
                                                           " stop should be included in the message")
+        await self.client.send_message(self.game_channel, "Example: B4 D6 B8")
         self.board_message = await self.client.send_message(self.game_channel, self.render_board())
-        # print(self.board_message)
 
     async def handlemessage(self, message):
 
-        # delete the message and update the board
-        await self.client.delete_message(message)
-        await self.client.edit_message(self.board_message, self.render_board())
+        # Ignore messages that don't come from players
+        if message.author != self.players[self.active_player]:
+            pass
+
+        coordinates = message.content.split(" ")
+        self.message_bin.append(message)
+        valid = False
+        for coordinate_string in coordinates:
+            # Enforce code length
+            if len(coordinate_string) != 2:
+                self.message_bin.append(self.client.send_message(self.game_channel,
+                                                                 "{} is not a valid coordinate! Try again"
+                                                                 .format(coordinate_string)))
+                return -1
+
+            working = coordinate_string.upper().split()
+
+            # Enforce value restrictions
+            if not (int("A") <= int(working[0]) <= int("F")):
+                self.message_bin.append(self.client.send_message(self.game_channel,
+                                                                 "{} is outside board! Try again"
+                                                                 .format(working[0])))
+                return -1
+
+            if not (1 <= int(working[1] <= 8)):
+                self.message_bin.append(self.client.send_message(self.game_channel,
+                                                                 "{} is outside board! Try again"
+                                                                 .format(working[1])))
+                return -1
+
+        if valid:
+            ret_code = self.engine.processmove(coordinates, message.author)
+            if ret_code == 0:
+                self.client.send_message(self.game_channel, "Sorry, {}, it's not your turn"
+                                         .format(message.author.mention))
+                return -1
+            elif ret_code == -1:
+                self.client.send_message(self.game_channel, "Illegal move! Try again.")
+            # delete the message and update the board
+            for item in self.message_bin:
+                self.client.delete_message(item)
+            self.message_bin.clear()
+            await self.client.edit_message(self.board_message, self.render_board())
         return 0
 
     async def gamecomplete(self, win_state):
+        if win_state != -1:
+            if win_state == 1:
+                winner = self.players[1]
+                loser = self.players[0]
+            else:
+                winner = self.players[0]
+                loser = self.players[1]
+            await self.client.send_message(self.host_channel, "{} defeated {} in {} moves!".format(winner, loser,
+                                                                                                   self.engine.moves))
+        else:
+            await self.client.send_message(self.host_channel, "Game forfeit.")
+
+        await self.client.delete_channel(self.game_channel)
         pass
 
     def render_board(self):

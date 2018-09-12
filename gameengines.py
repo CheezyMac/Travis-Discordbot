@@ -46,6 +46,8 @@ class CheckersEngine:
     def __init__(self, players):
         self.player_one = players[0]
         self.player_two = players[1]
+        self.mid_round = False
+        self.moves = 0
         self.board = [
             ['x', 'x', 'x', 'x'],
             ['x', 'x', 'x', 'x'],
@@ -56,9 +58,23 @@ class CheckersEngine:
             ['o', 'o', 'o', 'o'],
             ['o', 'o', 'o', 'o']
         ]
-        pass
-    # ○◙☺☻
-    # ☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼
 
-    def processmove(self, initial_coords, new_coords, player):
+    def processmove(self, coordinates, player):
+        for i in range(len(coordinates) - 1):
+            pass
+        if self.player_two == player:
+            if self.mid_round:
+                pass
+            else:
+                return 0
+        else:
+            if not self.mid_round:
+                pass
+            else:
+                return 0
         pass
+
+    def convert_coordinates(self, coordinate_string):
+        pass
+
+

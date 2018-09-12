@@ -1,7 +1,10 @@
 import configuration as cfg    # Import configuration settings
 import discord          # Import discord API
 import features
+import sys
 
+if len(sys.argv) != 2:
+    print("Argument error! Please enter only the bot token as argument")
 client = discord.Client()
 print(discord.__version__)
 active_games = []
@@ -38,4 +41,4 @@ async def on_ready():
     print("Bot ready!")
     print("Logged in as {} ({})".format(client.user.name, client.user.id))
 
-client.run(cfg.BOT_TOKEN)
+client.run(sys.argv[1])
