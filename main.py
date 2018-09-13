@@ -26,8 +26,8 @@ async def on_message(message):
             elif ret_code == 0:  # If game did not handle message, continue processing
                 continue
 
-    if message.content.upper().startswith("TRAVIS, PLAY "):
-        name = message.content.upper()[13:]
+    if message.content.upper().startswith(cfg.COMMANDS["play"]):
+        name = message.content.upper()[len(cfg.COMMANDS["play"]):]
 
         if name in cfg.KNOWN_GAMES:
             game, channel_name = await cfg.KNOWN_GAMES[name](client, message)

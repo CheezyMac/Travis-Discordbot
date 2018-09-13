@@ -4,8 +4,6 @@ from math import floor
 
 
 async def create_game(client, message):
-    await client.send_message(message.channel, "Sorry, checkers is under development")
-    #return -1
     # Get the second player
     join_request = await client.send_message(message.channel, "One more player needed. "
                                                               "Reply '>Join' in 30 seconds to join")
@@ -95,13 +93,16 @@ class Checkers(Game):
             ret_code = self.engine.processmove(coordinates, message.author)
 
             # Check if successful
-            if ret_code == 0:
+            if ret_code == -1:
                 self.client.send_message(self.game_channel, "Sorry, {}, it's not your turn"
                                          .format(message.author.mention))
                 return -1
-            elif ret_code == -1:
+            elif ret_code == -2:
                 self.client.send_message(self.game_channel, "Illegal move! Try again.")
                 return -1
+            elif ret_code > 0:
+                await self.gamecomplete(ret_code)
+                return 2
 
             # Change the active player
             if self.engine.mid_round:
@@ -186,17 +187,17 @@ class CheckersEngine:
         if self.player_two == player:
             player_piece = "O"
             if not self.mid_round:
-                return 0
+                return -1
         else:
             player_piece = "X"
             if self.mid_round:
-                return 0
+                return -1
 
         start_position = self.convert_coordinates(coordinates[0])
 
         # Enforce moving own pieces
         if self.board[start_position[0]][start_position[1]].upper() != player_piece:
-            return -1
+            return -2
 
         player_piece = self.board[start_position[0]][start_position[1]]
 
@@ -210,7 +211,7 @@ class CheckersEngine:
                 for item in results:
                     board_changes.append(item)
             else:
-                return -1
+                return -2
             start_position = end_position
 
             # Check if the piece should be crowned
@@ -222,8 +223,14 @@ class CheckersEngine:
             self.board[item[0]][item[1]] = item[2]
 
         # Check for win state
-
-        # Check for deadlock
+        pieces = {" ": 0, "X": 0, "O": 0}
+        for row in range(len(self.board)):
+            for column in range(len(self.board[row])):
+                pieces[self.board[row][column].upper()] += 1
+        if pieces["X"] == 0:
+            return 2
+        elif pieces["O"] == 0:
+            return 1
 
         # Increment the turn counter & swap players
         if self.mid_round:
@@ -232,7 +239,7 @@ class CheckersEngine:
         else:
             self.mid_round = True
 
-        return 1
+        return 0
 
     def validate_move(self, start_position, end_position, player_piece):
         # Positions of form (vert, horiz)
@@ -244,7 +251,14 @@ class CheckersEngine:
 
         d_vert = end_position[0]-start_position[1]
         d_horiz = end_position[1]-start_position[1]
-        changes = [(start_position[0], start_position[1], " ")]
+        changes = [(start_position[0], start_position[1], " "), (end_position[0], end_position[1], player_piece)]
+
+        # Enforce valid movement direction
+        if not player_piece.isupper():
+            if d_vert < 0 and player_piece == "x":
+                return -1
+            elif d_vert > 0 and player_piece == "o":
+                return -1
 
         # Enforce valid movement distances
         if d_vert == 0 or abs(d_vert) >= 2:
@@ -254,15 +268,44 @@ class CheckersEngine:
                 if not (abs(d_vert) == 1 and -1 <= d_horiz <= 0) and not (abs(d_vert) == 2 and (abs(d_horiz) == 1)):
                     return -1
                 else:
-                    pass
+                    if abs(d_vert) == 2:
+                        if d_horiz == 1:
+                            hopped_piece = self.board[start_position[0]+d_vert/2][start_position[1]].upper()
+                            # Ensure hopping over opponent pieces only
+                            if hopped_piece == " " or hopped_piece == player_piece.upper():
+                                return -1
+                            else:
+                                changes.append((start_position[0]+d_vert/2, start_position[1], " "))
+                        elif d_horiz == -1:
+                            hopped_piece = self.board[start_position[0] + d_vert / 2][start_position[1]-1].upper()
+                            # Ensure hopping over opponent pieces only
+                            if hopped_piece == " " or hopped_piece == player_piece.upper():
+                                return -1
+                            else:
+                                changes.append((start_position[0] + d_vert / 2, start_position[1]-1, " "))
+                    else:  # If not jumping, move validation complete
+                        return changes
             else:
                 if not (abs(d_vert) == 1 and 0 <= d_horiz <= 1) and not (abs(d_vert) == 2 and (abs(d_horiz) == 1)):
                     return -1
                 else:
-                    pass
-
-
-
+                    if abs(d_vert) == 2:
+                        if d_horiz == 1:
+                            hopped_piece = self.board[start_position[0] + d_vert / 2][start_position[1] + 1].upper()
+                            # Ensure hopping over opponent pieces only
+                            if hopped_piece == " " or hopped_piece == player_piece.upper():
+                                return -1
+                            else:
+                                changes.append((start_position[0] + d_vert / 2, start_position[1] + 1, " "))
+                        elif d_horiz == -1:
+                            hopped_piece = self.board[start_position[0] + d_vert / 2][start_position[1]].upper()
+                            # Ensure hopping over opponent pieces only
+                            if hopped_piece == " " or hopped_piece == player_piece.upper():
+                                return -1
+                            else:
+                                changes.append((start_position[0] + d_vert / 2, start_position[1], " "))
+                    else:  # If not jumping, move validation complete
+                        return changes
         return -1
 
     @staticmethod
