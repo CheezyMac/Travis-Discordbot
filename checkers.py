@@ -1,27 +1,30 @@
 from discord import PermissionOverwrite, ChannelType
 from game import Game
 from math import floor
+import configuration as cfg
 
 
 async def create_game(client, message):
     # Get the second player
     join_request = await client.send_message(message.channel, "One more player needed. "
                                                               "Reply '>Join' in 30 seconds to join")
-    reply = await client.wait_for_message(timeout=30, channel=message.channel, content=">Join")
-    if reply.content is None:
+    reply = await client.wait_for_message(timeout=30, channel=message.channel, content=">join")
+    if reply is None:
         # Delete the call for players, & close the game
         await client.send_message(message.channel, "Game cancelled: Player timeout reached")
         await client.delete_message(join_request)
         return -1
-
-    # Create a game channel
-    default_permissions = PermissionOverwrite(read_messages=False)
-    player_permissions = PermissionOverwrite(read_messages=True)
-    channel = await client.create_channel(message.server, 'checkers',
-                                          (message.server.default_role, default_permissions),
-                                          (message.server.me, player_permissions),
-                                          (message.author, player_permissions), (reply.author, player_permissions),
-                                          type=ChannelType.text)
+    if not cfg.BOT_TEST_MODE:
+        # Create a game channel
+        default_permissions = PermissionOverwrite(read_messages=False)
+        player_permissions = PermissionOverwrite(read_messages=True)
+        channel = await client.create_channel(message.server, 'checkers',
+                                              (message.server.default_role, default_permissions),
+                                              (message.server.me, player_permissions),
+                                              (message.author, player_permissions), (reply.author, player_permissions),
+                                              type=ChannelType.text)
+    else:
+        channel = message.channel
     checkers = Checkers(client, channel, message.channel, [message.author, message.author])
     await checkers.announcerules()
 
@@ -64,7 +67,7 @@ class Checkers(Game):
 
         coordinates = message.content.split(" ")
         self.message_bin.append(message)
-        valid = False
+
         for coordinate_string in coordinates:
             # Enforce code length
             if len(coordinate_string) != 2:
@@ -73,49 +76,50 @@ class Checkers(Game):
                                                                  .format(coordinate_string)))
                 return -1
 
-            working = coordinate_string.upper().split()
+            working = coordinate_string.upper()#.split('')
+            print(working)
 
             # Enforce value restrictions
-            if not (int("A") <= int(working[0]) <= int("H")):
-                self.message_bin.append(self.client.send_message(self.game_channel,
+            if not (ord("A") <= ord(working[0]) <= ord("H")):
+                self.message_bin.append(await self.client.send_message(self.game_channel,
                                                                  "{} is outside board! Try again"
                                                                  .format(working[0])))
                 return -1
 
-            if not (1 <= int(working[1] <= 8)):
-                self.message_bin.append(self.client.send_message(self.game_channel,
+            if not (1 <= int(working[1]) <= 8):
+                self.message_bin.append(await self.client.send_message(self.game_channel,
                                                                  "{} is outside board! Try again"
                                                                  .format(working[1])))
                 return -1
 
-        if valid:
-            # Try to make the move
-            ret_code = self.engine.processmove(coordinates, message.author)
+        # Try to make the move
+        print("Processing move with coords: {}".format(coordinates))
+        ret_code = self.engine.processmove(coordinates, message.author)
 
-            # Check if successful
-            if ret_code == -1:
-                self.client.send_message(self.game_channel, "Sorry, {}, it's not your turn"
-                                         .format(message.author.mention))
-                return -1
-            elif ret_code == -2:
-                self.client.send_message(self.game_channel, "Illegal move! Try again.")
-                return -1
-            elif ret_code > 0:
-                await self.gamecomplete(ret_code)
-                return 2
+        # Check if successful
+        if ret_code == -1:
+            await self.client.send_message(self.game_channel, "Sorry, {}, it's not your turn"
+                                     .format(message.author.mention))
+            return -1
+        elif ret_code == -2:
+            await self.client.send_message(self.game_channel, "Illegal move! Try again.")
+            return -1
+        elif ret_code > 0:
+            await self.gamecomplete(ret_code)
+            return 2
 
-            # Change the active player
-            if self.engine.mid_round:
-                self.active_player = self.engine.player_two
-            else:
-                self.active_player = self.engine.player_one
+        # Change the active player
+        if self.engine.mid_round:
+            self.active_player = self.engine.player_two
+        else:
+            self.active_player = self.engine.player_one
 
-            # delete the messages and update the board
-            for item in self.message_bin:
-                self.client.delete_message(item)
-            self.message_bin.clear()
-            await self.client.edit_message(self.board_message, self.render_board())
-            self.message_bin.append(self.client.send_message(self.game_channel, "{}'s turn".format(self.active_player)))
+        # delete the messages and update the board
+        for item in self.message_bin:
+            self.client.delete_message(item)
+        self.message_bin.clear()
+        await self.client.edit_message(self.board_message, self.render_board())
+        self.message_bin.append(self.client.send_message(self.game_channel, "{}'s turn".format(self.active_player)))
 
         return 0
 
@@ -131,9 +135,8 @@ class Checkers(Game):
                                                                                                    self.engine.moves))
         else:
             await self.client.send_message(self.host_channel, "Game forfeit.")
-
-        await self.client.delete_channel(self.game_channel)
-        pass
+        if not cfg.BOT_TEST_MODE:
+            await self.client.delete_channel(self.game_channel)
 
     def render_board(self):
 
@@ -155,7 +158,7 @@ class Checkers(Game):
         output.append("2 |   | {} |   | {} |   | {} |   | {} |\n".format(b[1][0], b[1][1], b[1][2], b[1][3]))
         output.append("  ---------------------------------\n")
         output.append("1 | {} |   | {} |   | {} |   | {} |   |\n".format(b[0][0], b[0][1], b[0][2], b[0][3]))
-        output.append("  ---------------------------------")
+        output.append("  ---------------------------------\n")
         output.append("    a   b   c   d   e   f   g   h```")
 
         return ''.join(output)
@@ -310,9 +313,8 @@ class CheckersEngine:
 
     @staticmethod
     def convert_coordinates(coordinate_string):
-        raw_coords = coordinate_string.split("")
-        vertical = int(raw_coords[1]) - 1
-        horizontal = int(raw_coords[0].upper()) - int("A")
+        vertical = int(coordinate_string[1]) - 1
+        horizontal = ord(coordinate_string[0].upper()) - ord("A")
 
         if horizontal % 2 != 0:
             if vertical % 2 != 0:

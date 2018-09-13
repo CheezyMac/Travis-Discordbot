@@ -1,14 +1,18 @@
 from discord import PermissionOverwrite, ChannelType
 from game import Game
+import configuration as cfg
 
 
 async def create_game(client, message):
     # Creates a channel that only the players (And administrators) can see
     default_permissions = PermissionOverwrite(read_messages=False)
     player_permissons = PermissionOverwrite(read_messages=True)
-    channel = await client.create_channel(message.server, 'mastermind', (message.server.default_role, default_permissions),
-                                          (message.server.me, player_permissons), (message.author, player_permissons),
-                                          type=ChannelType.text)
+    if cfg.BOT_TEST_MODE:
+        channel = message.channel
+    else:
+        channel = await client.create_channel(message.server, 'mastermind', (message.server.default_role, default_permissions),
+                                              (message.server.me, player_permissons), (message.author, player_permissons),
+                                              type=ChannelType.text)
     code_length = 4
     repeats_allowed = False
     domain_length = 9
@@ -111,8 +115,8 @@ class Mastermind(Game):
                                            .format(self.players[0].mention, self.engine.turns, self.engine.code_length,
                                                    self.engine.domain_size,
                                                    "On" if self.engine.repeats_allowed else "Off"))
-
-        await self.client.delete_channel(self.game_channel)
+        if not cfg.BOT_TEST_MODE:
+            await self.client.delete_channel(self.game_channel)
 
         # TODO: Add score to the leaderboard
 

@@ -8,7 +8,7 @@ r.dynamic_energy_threshold = cfg.SR_DYNAMIC_ENERGY_THRESHOLD
 
 
 def get_game_ready():
-    return cfg.GAME_READY_ANNOUNCEMENTS[randint(0, len(cfg.GAME_READY_PREFIXES))]
+    return cfg.GAME_READY_ANNOUNCEMENTS[randint(0, len(cfg.GAME_READY_ANNOUNCEMENTS)-1)]
 
 
 async def list_games(client, channel):

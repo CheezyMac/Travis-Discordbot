@@ -3,7 +3,7 @@ import discord          # Import discord API
 import features
 import sys
 
-if len(sys.argv) != 2:
+if not 2 <= len(sys.argv) <= 3:
     print("Argument error! Please enter only the bot token as argument")
 client = discord.Client()
 print(discord.__version__)
@@ -29,7 +29,7 @@ async def on_message(message):
     if message.content.upper().startswith(cfg.COMMANDS["play"]):
         name = message.content.upper()[len(cfg.COMMANDS["play"]):]
 
-        if name in cfg.KNOWN_GAMES:
+        if name.upper() in cfg.KNOWN_GAMES:
             game, channel_name = await cfg.KNOWN_GAMES[name](client, message)
             if game != -1:
                 active_games.append(game)
@@ -45,5 +45,6 @@ async def on_message(message):
 async def on_ready():
     print("Bot ready!")
     print("Logged in as {} ({})".format(client.user.name, client.user.id))
-
+if len(sys.argv) == 3:
+    cfg.BOT_TEST_MODE = bool(sys.argv[2])
 client.run(sys.argv[1])
