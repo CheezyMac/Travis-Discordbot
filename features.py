@@ -27,6 +27,7 @@ async def creategame(game, client, message):
         await client.send_message(message.channel, "Let the game begin! Head over to the mastermind channel to play")
         return mastermind
     elif game == "CHECKERS":
+        await client.send_message(message.channel, "Sorry, checkers is under development")
         # Get the second player
         join_request = await client.send_message(message.channel, "One more player needed. "
                                                                   "Reply '>Join' in 30 seconds to join")
@@ -50,22 +51,24 @@ async def creategame(game, client, message):
         await client.send_message(message.channel, "{} Head over to the checkers channel to play".format(cfg.get_game_ready()))
         return checkers
     else:
-        print(game)
-        available_games = []
-        column_count = 0
-        rows = 0
-        for game in cfg.KNOWN_GAMES:
-            available_games.append(game)
-            column_count += 1
-            if column_count == 3:
-                available_games.append("\n")
-                column_count = 0
-                rows += 1
-            else:
-                available_games.append("\t")
-        del available_games[-1]
-        available_games = ''.join(available_games)
-
-        await client.send_message(message.channel, "Sorry, I don't recognize that game. Here are the ones I know:"
-                                  "```{}```".format(available_games))
         return -1
+
+
+async def list_games(client, channel):
+    available_games = []
+    column_count = 0
+    rows = 0
+    for game in cfg.KNOWN_GAMES:
+        available_games.append(game)
+        column_count += 1
+        if column_count == 3:
+            available_games.append("\n")
+            column_count = 0
+            rows += 1
+        else:
+            available_games.append("\t")
+    del available_games[-1]
+    available_games = ''.join(available_games)
+
+    await client.send_message(channel, "Sorry, I don't recognize that game. Here are the ones I know:"
+                                         "```{}```".format(available_games))

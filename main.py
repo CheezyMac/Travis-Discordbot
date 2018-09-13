@@ -27,10 +27,14 @@ async def on_message(message):
                 continue
 
     if message.content.upper().startswith("TRAVIS, PLAY "):
-        game = await features.creategame(message.content.upper()[13:], client, message)
-        if game != -1:
-            active_games.append(game)
-        return
+        name = message.content.upper()[13:]
+
+        if name in cfg.KNOWN_GAMES:
+            game = await cfg.KNOWN_GAMES[name](client, message)
+            if game != -1:
+                active_games.append(game)
+        else:
+            await features.list_games(client, message.channel)
 
     if cfg.BOT_SEARCH_STRING.upper() in message.content.upper():
         print("{} mentioned something I'm interested in!".format(message.author))

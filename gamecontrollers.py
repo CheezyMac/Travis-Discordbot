@@ -176,7 +176,7 @@ class Checkers(Game):
             working = coordinate_string.upper().split()
 
             # Enforce value restrictions
-            if not (int("A") <= int(working[0]) <= int("F")):
+            if not (int("A") <= int(working[0]) <= int("H")):
                 self.message_bin.append(self.client.send_message(self.game_channel,
                                                                  "{} is outside board! Try again"
                                                                  .format(working[0])))
@@ -189,18 +189,31 @@ class Checkers(Game):
                 return -1
 
         if valid:
+            # Try to make the move
             ret_code = self.engine.processmove(coordinates, message.author)
+
+            # Check if successful
             if ret_code == 0:
                 self.client.send_message(self.game_channel, "Sorry, {}, it's not your turn"
                                          .format(message.author.mention))
                 return -1
             elif ret_code == -1:
                 self.client.send_message(self.game_channel, "Illegal move! Try again.")
-            # delete the message and update the board
+                return -1
+
+            # Change the active player
+            if self.engine.mid_round:
+                self.active_player = self.engine.player_two
+            else:
+                self.active_player = self.engine.player_one
+
+            # delete the messages and update the board
             for item in self.message_bin:
                 self.client.delete_message(item)
             self.message_bin.clear()
             await self.client.edit_message(self.board_message, self.render_board())
+            self.message_bin.append(self.client.send_message(self.game_channel, "{}'s turn".format(self.active_player)))
+
         return 0
 
     async def gamecomplete(self, win_state):
@@ -240,6 +253,6 @@ class Checkers(Game):
         output.append("  ---------------------------------\n")
         output.append("1 | {} |   | {} |   | {} |   | {} |   |\n".format(b[0][0], b[0][1], b[0][2], b[0][3]))
         output.append("  ---------------------------------")
-        output.append("    a   b   c   d   e   f```")
+        output.append("    a   b   c   d   e   f   g   h```")
 
         return ''.join(output)
