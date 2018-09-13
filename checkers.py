@@ -1,131 +1,33 @@
-import gameengines
+from discord import PermissionOverwrite, ChannelType
+from game import Game
+from math import floor
 
 
-class Game:
+async def create_game(client, message):
+    await client.send_message(message.channel, "Sorry, checkers is under development")
+    #return -1
+    # Get the second player
+    join_request = await client.send_message(message.channel, "One more player needed. "
+                                                              "Reply '>Join' in 30 seconds to join")
+    reply = await client.wait_for_message(timeout=30, channel=message.channel, content=">Join")
+    if reply.content is None:
+        # Delete the call for players, & close the game
+        await client.send_message(message.channel, "Game cancelled: Player timeout reached")
+        await client.delete_message(join_request)
+        return -1
 
-    name = ""
-    players = []
-    player_count = 0
-    game_channel = ""
-    host_channel = ""
+    # Create a game channel
+    default_permissions = PermissionOverwrite(read_messages=False)
+    player_permissions = PermissionOverwrite(read_messages=True)
+    channel = await client.create_channel(message.server, 'checkers',
+                                          (message.server.default_role, default_permissions),
+                                          (message.server.me, player_permissions),
+                                          (message.author, player_permissions), (reply.author, player_permissions),
+                                          type=ChannelType.text)
+    checkers = Checkers(client, channel, message.channel, [message.author, message.author])
+    await checkers.announcerules()
 
-    def __init__(self, client, game_channel, host_channel, players):
-        self.client = client
-        self.game_channel = game_channel
-        self.host_channel = host_channel
-        self.players = players
-
-    def announcerules(self):
-        pass
-
-    ''' Return codes:
-    -1: Error
-    0: Message ignored
-    1: Successfully processed
-    2: Game ended
-    '''
-    def handlemessage(self, message):
-        return 0
-
-    def gamecomplete(self, win_state):
-        pass
-
-
-class Mastermind(Game):
-    name = "mastermind"
-    player_count = 1
-
-    def __init__(self, client, game_channel, host_channel, players, code_length, repeats_allowed, domain_length, turns):
-        if len(players) != self.player_count:
-            print("Invalid player count in Mastermind!")
-            self.ready = False
-            return
-        self.engine = gameengines.MastermindEngine(code_length, repeats_allowed, domain_length, turns)
-        self.ready = True
-        Game.__init__(self, client, game_channel, host_channel, players)
-
-    async def announcerules(self):
-        await self.client.send_message(self.game_channel, "Game rules: {} turns, {} digit code, digits 0-{}, repeats {}"
-                                       .format(self.engine.max_turns, self.engine.code_length, self.engine.domain_size,
-                                               "On" if self.engine.repeats_allowed else "Off"))
-        await self.client.send_message(self.game_channel,
-                                       "After each guess, I will reply with the number of guesses in the correct "
-                                       "positions & correct colours, and with the number of guesses with the correct "
-                                       "colours in the form [correct, almost correct]")
-        await self.client.send_message(self.game_channel,
-                                       "Guesses should be made in the form '##-##-##-##', without quotes")
-        # TODO: make format warning obey code length
-
-    async def handlemessage(self, message):
-
-        if message.author == self.players[0]:
-            if message.content.upper() == "TERMINATE":
-                await self.gamecomplete(False)
-                return 2
-            else:
-                possible_guess = message.content.split("-")
-
-                # Enforce code length
-                if len(possible_guess) != self.engine.code_length:
-                    await self.client.send_message(self.game_channel, "Your guess must have {} elements! Try again"
-                                                   .format(self.engine.code_length))
-                    return 1
-
-                guess = []
-                # Enforce & convert to numeric symbols
-                for element in possible_guess:
-                    try:
-                        guess.append(int(element))
-                    except ValueError:
-                        await self.client.send_message(self.game_channel,
-                                                       "{} is not a valid number! Try again".format(element))
-                        return 1
-
-                # Enforce domain bounds
-                for element in guess:
-                    if element > self.engine.domain_size:
-                        await self.client.send_message(self.game_channel,
-                                                       "{} is out of bounds! Try again".format(element))
-                        return 1
-
-                # Enforce repeat elements
-                if not self.engine.repeats_allowed:
-                    for element in guess:
-                        if guess.count(element) != 1:
-                            await self.client.send_message(self.game_channel,
-                                                           "Repeat elements are not allowed! Try again")
-                            return 1
-                # TODO: more sanity checking
-
-                # Evaluate the guess
-                score = self.engine.evaluateguess(guess)
-
-                if self.engine.complete:
-                    await self.gamecomplete(self.engine.win_state)
-                    return 2
-                await self.client.send_message(self.game_channel, "[{}, {}]".format(score[0], score[1]))
-                return 1
-        else:
-            return 0
-
-    async def gamecomplete(self, win_state):
-        # Close the game channel & report the scores to the host channel
-        if win_state:
-            await self.client.send_message(self.host_channel, "{} completed Mastermind in {} turns!\nGame settings:\n"
-                                                              "```{} digit code, digits 0-{}, repeats {}```"
-                                           .format(self.players[0].mention, self.engine.turns, self.engine.code_length,
-                                                   self.engine.domain_size,
-                                                   "On" if self.engine.repeats_allowed else "Off"))
-        else:
-            await self.client.send_message(self.host_channel, "{} failed to completed Mastermind in {} turns.\nGame "
-                                                              "settings:\n```{} digit code, digits 0-{}, repeats {}```"
-                                           .format(self.players[0].mention, self.engine.turns, self.engine.code_length,
-                                                   self.engine.domain_size,
-                                                   "On" if self.engine.repeats_allowed else "Off"))
-
-        await self.client.delete_channel(self.game_channel)
-
-        # TODO: Add score to the leaderboard
+    return checkers, "checkers"
 
 
 class Checkers(Game):
@@ -138,7 +40,7 @@ class Checkers(Game):
             print("Invalid player count in Checkers!")
             self.ready = False
             return
-        self.engine = gameengines.CheckersEngine(players)
+        self.engine = CheckersEngine(players)
         self.board_message = None
         self.active_player = 0
         self.ready = True
@@ -256,3 +158,126 @@ class Checkers(Game):
         output.append("    a   b   c   d   e   f   g   h```")
 
         return ''.join(output)
+
+
+class CheckersEngine:
+
+    def __init__(self, players):
+        self.player_one = players[0]
+        self.player_two = players[1]
+        self.player_one_pieces = 12
+        self.player_two_pieces = 12
+        self.mid_round = False
+        self.moves = 0
+        self.board = [
+            ['x', 'x', 'x', 'x'],
+            ['x', 'x', 'x', 'x'],
+            ['x', 'x', 'x', 'x'],
+            [' ', ' ', ' ', ' '],
+            [' ', ' ', ' ', ' '],
+            ['o', 'o', 'o', 'o'],
+            ['o', 'o', 'o', 'o'],
+            ['o', 'o', 'o', 'o']
+        ]
+
+    def processmove(self, coordinates, player):
+
+        # Enforce player turns
+        if self.player_two == player:
+            player_piece = "O"
+            if not self.mid_round:
+                return 0
+        else:
+            player_piece = "X"
+            if self.mid_round:
+                return 0
+
+        start_position = self.convert_coordinates(coordinates[0])
+
+        # Enforce moving own pieces
+        if self.board[start_position[0]][start_position[1]].upper() != player_piece:
+            return -1
+
+        player_piece = self.board[start_position[0]][start_position[1]]
+
+        board_changes = []
+        for i in range(1, len(coordinates)):
+            end_position = self.convert_coordinates(coordinates[i])
+            results = self.validate_move(start_position, end_position, player_piece)
+
+            # Add changes to queue if move possible, otherwise cancel move
+            if results != -1:
+                for item in results:
+                    board_changes.append(item)
+            else:
+                return -1
+            start_position = end_position
+
+            # Check if the piece should be crowned
+            if end_position[0] == 7 or end_position[0] == 0:
+                player_piece = player_piece.upper()
+
+        # Commit the changes to board
+        for item in board_changes:
+            self.board[item[0]][item[1]] = item[2]
+
+        # Check for win state
+
+        # Check for deadlock
+
+        # Increment the turn counter & swap players
+        if self.mid_round:
+            self.moves += 1
+            self.mid_round = False
+        else:
+            self.mid_round = True
+
+        return 1
+
+    def validate_move(self, start_position, end_position, player_piece):
+        # Positions of form (vert, horiz)
+        # Should return either [(vert,horiz,val),...] or [-1]
+
+        # Ensure destination is not occupied
+        if self.board[end_position[0]][end_position[1]] != " ":
+            return -1
+
+        d_vert = end_position[0]-start_position[1]
+        d_horiz = end_position[1]-start_position[1]
+        changes = [(start_position[0], start_position[1], " ")]
+
+        # Enforce valid movement distances
+        if d_vert == 0 or abs(d_vert) >= 2:
+            return -1
+        else:
+            if start_position[0] % 2 == 0:
+                if not (abs(d_vert) == 1 and -1 <= d_horiz <= 0) and not (abs(d_vert) == 2 and (abs(d_horiz) == 1)):
+                    return -1
+                else:
+                    pass
+            else:
+                if not (abs(d_vert) == 1 and 0 <= d_horiz <= 1) and not (abs(d_vert) == 2 and (abs(d_horiz) == 1)):
+                    return -1
+                else:
+                    pass
+
+
+
+        return -1
+
+    @staticmethod
+    def convert_coordinates(coordinate_string):
+        raw_coords = coordinate_string.split("")
+        vertical = int(raw_coords[1]) - 1
+        horizontal = int(raw_coords[0].upper()) - int("A")
+
+        if horizontal % 2 != 0:
+            if vertical % 2 != 0:
+                return vertical, int(floor(float(horizontal)/2.0))
+            else:
+                return -1
+        else:
+            if vertical % 2 != 0:
+                return -1
+            else:
+                return vertical, int(floor(float(horizontal) / 2.0))

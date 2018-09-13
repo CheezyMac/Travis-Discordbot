@@ -30,9 +30,10 @@ async def on_message(message):
         name = message.content.upper()[13:]
 
         if name in cfg.KNOWN_GAMES:
-            game = await cfg.KNOWN_GAMES[name](client, message)
+            game, channel_name = await cfg.KNOWN_GAMES[name](client, message)
             if game != -1:
                 active_games.append(game)
+                await client.send_message(message.channel, features.get_game_ready().format(channel_name))
         else:
             await features.list_games(client, message.channel)
 
