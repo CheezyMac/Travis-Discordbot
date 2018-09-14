@@ -7,7 +7,7 @@ import configuration as cfg
 async def create_game(client, message):
     # Get the second player
     join_request = await client.send_message(message.channel, "One more player needed. "
-                                                              "Reply '>Join' in 30 seconds to join")
+                                                              "Reply '>join' in 30 seconds to join")
     reply = await client.wait_for_message(timeout=30, channel=message.channel, content=">join")
     if reply is None:
         # Delete the call for players, & close the game
@@ -43,9 +43,10 @@ class Checkers(Game):
             return
         self.engine = CheckersEngine(players)
         self.board_message = None
-        self.active_player = 0
+        self.active_player = self.engine.player_one
         self.ready = True
         self.message_bin = []
+        print(players)
         Game.__init__(self, client, game_channel, host_channel, players)
 
     async def announcerules(self):
@@ -58,12 +59,19 @@ class Checkers(Game):
                                                           " stop should be included in the message")
         await self.client.send_message(self.game_channel, "Example: B4 D6 B8")
         self.board_message = await self.client.send_message(self.game_channel, self.render_board())
+        self.message_bin.append(await self.client.send_message(self.game_channel,
+                                                               "It's {}'s turn".format(self.engine.player_one.mention)))
 
     async def handlemessage(self, message):
 
         # Ignore messages that don't come from players
-        if message.author != self.players[self.active_player]:
-            pass
+        if message.author != self.players[0] and message.author != self.players[1]:
+            print("Not a player!")
+            return -1
+
+        if message.content.upper() == "TERMINATE":
+            await self.gamecomplete(-1)
+            return -1
 
         coordinates = message.content.split(" ")
         self.message_bin.append(message)
@@ -71,12 +79,12 @@ class Checkers(Game):
         for coordinate_string in coordinates:
             # Enforce code length
             if len(coordinate_string) != 2:
-                self.message_bin.append(self.client.send_message(self.game_channel,
+                self.message_bin.append(await self.client.send_message(self.game_channel,
                                                                  "{} is not a valid coordinate! Try again"
                                                                  .format(coordinate_string)))
                 return -1
 
-            working = coordinate_string.upper()#.split('')
+            working = coordinate_string.upper()
             print(working)
 
             # Enforce value restrictions
@@ -115,11 +123,12 @@ class Checkers(Game):
             self.active_player = self.engine.player_one
 
         # delete the messages and update the board
+        print("Emptying the bin")
         for item in self.message_bin:
-            self.client.delete_message(item)
+            await self.client.delete_message(item)
         self.message_bin.clear()
         await self.client.edit_message(self.board_message, self.render_board())
-        self.message_bin.append(self.client.send_message(self.game_channel, "{}'s turn".format(self.active_player)))
+        self.message_bin.append(await self.client.send_message(self.game_channel, "{}'s turn".format(self.active_player)))
 
         return 0
 
@@ -167,8 +176,8 @@ class Checkers(Game):
 class CheckersEngine:
 
     def __init__(self, players):
-        self.player_one = players[0]
-        self.player_two = players[1]
+        self.player_one = players[1]
+        self.player_two = players[0]
         self.player_one_pieces = 12
         self.player_two_pieces = 12
         self.mid_round = False
@@ -252,7 +261,7 @@ class CheckersEngine:
         if self.board[end_position[0]][end_position[1]] != " ":
             return -1
 
-        d_vert = end_position[0]-start_position[1]
+        d_vert = end_position[0]-start_position[0]
         d_horiz = end_position[1]-start_position[1]
         changes = [(start_position[0], start_position[1], " "), (end_position[0], end_position[1], player_piece)]
 

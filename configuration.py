@@ -12,7 +12,7 @@ GAME_READY_ANNOUNCEMENTS = ["Let the game begin! Head on over to the _**{}**_ ch
                             "On your marks, get set... GO! Head on over to the _**{}**_ channel to play",
                             "Engines hot! Visit the _**{}**_ channel to start"]
 
-COMMANDS = {"play": ">PLAY "}
+COMMANDS = {"play": ">PLAY ", "help": ">HELP"}
 
 SR_ENERGY_THRESHOLD = 150
 SR_DYNAMIC_ENERGY_THRESHOLD = True

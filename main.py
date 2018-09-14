@@ -30,15 +30,27 @@ async def on_message(message):
         name = message.content.upper()[len(cfg.COMMANDS["play"]):]
 
         if name.upper() in cfg.KNOWN_GAMES:
-            game, channel_name = await cfg.KNOWN_GAMES[name](client, message)
-            if game != -1:
-                active_games.append(game)
-                await client.send_message(message.channel, features.get_game_ready().format(channel_name))
+            payload = await cfg.KNOWN_GAMES[name](client, message)
+            if payload != -1:
+                active_games.append(payload[0])
+                await client.send_message(message.channel, features.get_game_ready().format(payload[1]))
         else:
             await features.list_games(client, message.channel)
 
     if cfg.BOT_SEARCH_STRING.upper() in message.content.upper():
         print("{} mentioned something I'm interested in!".format(message.author))
+
+        if "PLAY" in message.content.upper():
+            print("User wants to play")
+            name = message.content.upper().split(" ")[-1]
+            print("I think they want to play {}".format(name))
+            if name.upper() in cfg.KNOWN_GAMES:
+                payload = await cfg.KNOWN_GAMES[name](client, message)
+                if payload != -1:
+                    active_games.append(payload[0])
+                    await client.send_message(message.channel, features.get_game_ready().format(payload[1]))
+            else:
+                await features.list_games(client, message.channel)
 
 
 @client.event

@@ -1,5 +1,6 @@
 from discord import PermissionOverwrite, ChannelType
 from game import Game
+from random import Random
 import configuration as cfg
 
 
@@ -20,8 +21,7 @@ async def create_game(client, message):
 
     mastermind = Mastermind(client, channel, message.channel, [message.author], code_length, repeats_allowed, domain_length, turns)
     await mastermind.announcerules()
-    await client.send_message(message.channel, "Let the game begin! Head over to the mastermind channel to play")
-    return mastermind
+    return mastermind, "mastermind"
 
 
 class Mastermind(Game):
